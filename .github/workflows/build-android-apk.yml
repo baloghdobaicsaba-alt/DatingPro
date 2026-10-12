@@ -24,13 +24,19 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # GitHub-hosted Ubuntu runners already include Android command-line tools.
-      # Avoid setup-android here: its automatic "sdkmanager tools" call fails
-      # with current SDK repositories because the legacy "tools" package is gone.
-      - name: Install Android SDK platform and build tools
+      - name: Install Android command-line tools
         run: |
-          yes | sdkmanager --licenses
-          sdkmanager "platform-tools" "platforms;android-30" "build-tools;30.0.3"
+          set -eux
+          mkdir -p "$ANDROID_HOME/cmdline-tools"
+          curl -fsSL "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip" -o /tmp/android-cmdline-tools.zip
+          mkdir -p /tmp/android-cmdline-tools
+          unzip -q /tmp/android-cmdline-tools.zip -d /tmp/android-cmdline-tools
+          mkdir -p "$ANDROID_HOME/cmdline-tools/latest"
+          cp -R /tmp/android-cmdline-tools/cmdline-tools/. "$ANDROID_HOME/cmdline-tools/latest/"
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_HOME" --licenses
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_HOME" "platform-tools" "platforms;android-30" "build-tools;30.0.3"
 
       - name: Set up Java 8 for legacy Gradle project
         uses: actions/setup-java@v4
