@@ -18,11 +18,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Java 8 for legacy Gradle project
+      # Current Android command-line tools require Java 17.
+      - name: Set up Java 17 for Android SDK tools
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '8'
+          java-version: '17'
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
@@ -32,14 +33,24 @@ jobs:
           sdkmanager "platform-tools" "platforms;android-30" "build-tools;30.0.3"
           yes | sdkmanager --licenses
 
+      # This legacy project uses Gradle 5.x, which should run under Java 8.
+      - name: Set up Java 8 for legacy Gradle project
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '8'
+
       - name: Extract Android source
         run: |
           test -f datingapp-huncutkodjunk-android-source-v6.zip
           unzip -q datingapp-huncutkodjunk-android-source-v6.zip -d source
+          find source -maxdepth 3 -name gradlew -print
 
       - name: Build debug APK
-        working-directory: source/DatingApp-master
         run: |
+          PROJECT_DIR="$(find source -maxdepth 4 -name gradlew -print -quit | xargs dirname)"
+          test -n "$PROJECT_DIR"
+          cd "$PROJECT_DIR"
           chmod +x ./gradlew
           ./gradlew --no-daemon assembleDebug
 
@@ -47,6 +58,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: huncutkodjunk-debug-apk
-          path: source/DatingApp-master/app/build/outputs/apk/debug/*.apk
+          path: source/**/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
