@@ -56,7 +56,14 @@ jobs:
           test -n "$PROJECT_DIR"
           cd "$PROJECT_DIR"
           chmod +x ./gradlew
-          ./gradlew --no-daemon assembleDebug
+          cat > /tmp/legacy-repositories.gradle <<'EOF'
+          allprojects {
+              repositories {
+                  jcenter()
+              }
+          }
+          EOF
+          ./gradlew --no-daemon -I /tmp/legacy-repositories.gradle assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
