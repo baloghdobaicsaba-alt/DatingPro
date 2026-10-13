@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - 'datingapp-huncutkodjunk-android-source-v6.zip'
+      - 'huncutkodjunk-android-source-complete-review.zip'
       - '.github/workflows/build-android-apk.yml'
 
 permissions:
@@ -13,10 +13,16 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Verify latest source archive
+        run: |
+          set -eux
+          test -s huncutkodjunk-android-source-complete-review.zip
+          unzip -t huncutkodjunk-android-source-complete-review.zip
 
       - name: Set up Java 17 for Android SDK tools
         uses: actions/setup-java@v4
@@ -44,31 +50,41 @@ jobs:
           distribution: temurin
           java-version: '8'
 
-      - name: Extract Android source
+      - name: Extract latest Android source
         run: |
-          test -f datingapp-huncutkodjunk-android-source-v6.zip
-          unzip -q datingapp-huncutkodjunk-android-source-v6.zip -d source
-          find source -maxdepth 4 -name gradlew -print
+          set -eux
+          mkdir -p source
+          unzip -q huncutkodjunk-android-source-complete-review.zip -d source
+          PROJECT_DIR="$(find source -maxdepth 7 -name gradlew -print -quit | xargs -r dirname)"
+          test -n "$PROJECT_DIR"
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          find "$PROJECT_DIR" -maxdepth 2 -type f \( -name 'settings.gradle' -o -name 'build.gradle' -o -name 'gradlew' \) -print
 
       - name: Build debug APK
         run: |
-          PROJECT_DIR="$(find source -maxdepth 5 -name gradlew -print -quit | xargs dirname)"
-          test -n "$PROJECT_DIR"
+          set -eux
           cd "$PROJECT_DIR"
           chmod +x ./gradlew
           cat > /tmp/legacy-repositories.gradle <<'EOF'
           allprojects {
               repositories {
+                  google()
+                  mavenCentral()
                   jcenter()
               }
           }
           EOF
           ./gradlew --no-daemon -I /tmp/legacy-repositories.gradle assembleDebug
 
+      - name: Verify APK exists
+        run: |
+          set -eux
+          find "$PROJECT_DIR" -type f -path '*/build/outputs/apk/debug/*.apk' -print -quit | grep -q .
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: huncutkodjunk-debug-apk
-          path: source/**/app/build/outputs/apk/debug/*.apk
+          path: ${{ env.PROJECT_DIR }}/**/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
